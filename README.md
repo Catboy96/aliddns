@@ -22,7 +22,15 @@ Simple DDNS utility with Alibaba Cloud (Aliyun) SDK
 
 2. Simply run this to check and update domain record if needed:
 ```shell
-aliddns
+$ aliddns
+Old IPv4:     [1.2.3.4]
+Current IPv4: [1.2.3.4]
+No need to update.
+
+$ aliddns
+Old IPv4:     [1.2.3.4]
+Current IPv4: [2.3.4.5]
+Record successfully updated.
 ```
 
 ## Dependencies
