@@ -201,11 +201,13 @@ static int gtb_get_domain_record (const string  &domain,
     arguments:      record_id:  alidns record id
                     rr:         alidns record rr
                     value:      alidns record value
+                    is_ipv6:    is ipv6
     return:         error code
 **********************************************************************************************************************/
 static int gtb_set_domain_record (const string &record_id,
                                   const string &rr,
-                                  const string &value)
+                                  const string &value,
+                                  bool is_ipv6)
 {
     if (record_id.empty()) return -EINVAL;
     if (value.empty()) return -EINVAL;
@@ -218,7 +220,7 @@ static int gtb_set_domain_record (const string &record_id,
     request.setDomain(SDK_REQUEST_DOMAIN);
     request.setVersion(SDK_REQUEST_VERSION);
     request.setQueryParameter("Action",     "UpdateDomainRecord");
-    request.setQueryParameter("Type",       "A");
+    request.setQueryParameter("Type",       is_ipv6 ? "AAAA" : "A");
     request.setQueryParameter("RecordId",   record_id);
     request.setQueryParameter("RR",         rr);
     request.setQueryParameter("Value",      value);
@@ -252,19 +254,19 @@ static size_t gtb_curl_writer (char   *data,
     return size * nmemb;
 }
 /**********************************************************************************************************************
-    description:    get current public ipv4 address
-    arguments:      url:    ipv4 query url
-                    ipv4:   ipv4 result
+    description:    get current public ip address
+    arguments:      url:    ip query url
+                    ip:     ip result
     return:         error code
 **********************************************************************************************************************/
-static int gtb_get_curr_ipv4 (const string  &url,
-                              string        *ipv4)
+static int gtb_get_curr_ip (const string  &url,
+                            string        *ip)
 {
     CURL        *curl;
     CURLcode     res;
     string       buffer;
 
-    if (!ipv4) return -EINVAL;
+    if (!ip) return -EINVAL;
     if (url.empty()) return -EINVAL;
 
     curl = curl_easy_init();
@@ -286,7 +288,7 @@ static int gtb_get_curr_ipv4 (const string  &url,
 
     curl_easy_cleanup(curl);
 
-    *ipv4 = gtb_trim(buffer);
+    *ip = gtb_trim(buffer);
 
     return 0;
 }
@@ -303,6 +305,7 @@ int main (int argc, char *argv[])
     ifstream    ifs;
     char       *home;
     int         conn_to, read_to;
+    string      record_id, record_value, record_rr;
 
     // get home directory path
     if ((home = getenv("HOME")) == nullptr) {
@@ -372,7 +375,6 @@ int main (int argc, char *argv[])
     // update each ipv4 domain name
     for (vector<string>::iterator i = domain_list_v4.begin(); i != domain_list_v4.end(); i++) {
         // get domain name record
-        string record_id, record_value, record_rr;
         if (gtb_get_domain_record(*i,
                                   &record_id,
                                   &record_value,
@@ -384,7 +386,7 @@ int main (int argc, char *argv[])
 
         // get current ipv4
         string ipv4;
-        if (gtb_get_curr_ipv4(root["query_ipv4"].asString(), &ipv4)) {
+        if (gtb_get_curr_ip(root["query_ipv4"].asString(), &ipv4)) {
             cerr << "Cannot get current IPv4." << endl;
             return -EBUSY;
         }
@@ -392,18 +394,71 @@ int main (int argc, char *argv[])
 
         // check if needed to update record
         if (record_value == ipv4) {
-            cout << "No need to update." << endl;
-            return 0;
+            cout << "Skipped:      (" << *i << ")[" << ipv4 << "]" << endl;
+            continue;
         }
 
         // set domain record
         if (gtb_set_domain_record(record_id,
                                   record_rr,
-                                  ipv4)) {
-            cerr << "Set domain record failed." << endl;
+                                  ipv4,
+                                  false)) {
+            cout << "Failed:       (" << *i << ")[" << ipv4 << "]" << endl;
             return -EINVAL;
         }
-        cout << "Record successfully updated." << endl;
+
+        cout << "Updated:      (" << *i << ")[" << ipv4 << "]" << endl;
+    }
+
+    // check if ipv6 domain exists
+    if (root["domain_name_v6"]) {
+        // check if configured ipv6 query url
+        if (!root["query_ipv6"]) {
+            cerr << "\"query_ipv6\" must be specified in configuration file." << endl;
+            return -EINVAL;
+        }
+
+        // get ipv6 domain list
+        vector<string> domain_list_v6;
+        gtb_split(root["domain_name_v6"].asString(), ',', domain_list_v6);
+
+        // update each ipv6 domain name
+        for (vector<string>::iterator i = domain_list_v6.begin(); i != domain_list_v6.end(); i++) {
+            // get domain name record
+            if (gtb_get_domain_record(*i,
+                                      &record_id,
+                                      &record_value,
+                                      &record_rr)) {
+                cerr << "Invalid domain name: " << *i << endl;
+                return -EINVAL;
+            }
+            cout << "Old IPv6:     (" << *i << ")[" << record_value << "]" << endl;
+
+            // get current ipv6
+            string ipv6;
+            if (gtb_get_curr_ip(root["query_ipv6"].asString(), &ipv6)) {
+                cerr << "Cannot get current IPv6." << endl;
+                return -EBUSY;
+            }
+            cout << "Current IPv6: (" << *i << ")[" << ipv6 << "]" << endl;
+
+            // check if needed to update record
+            if (record_value == ipv6) {
+                cout << "Skipped:      (" << *i << ")[" << ipv6 << "]" << endl;
+                continue;
+            }
+
+            // set domain record
+            if (gtb_set_domain_record(record_id,
+                                      record_rr,
+                                      ipv6,
+                                      true)) {
+                cout << "Failed:       (" << *i << ")[" << ipv6 << "]" << endl;
+                return -EINVAL;
+            }
+
+            cout << "Updated:      (" << *i << ")[" << ipv6 << "]" << endl;
+        }
     }
 
     // shutdown alibaba cloud sdk
