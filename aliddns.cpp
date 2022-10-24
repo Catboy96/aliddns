@@ -7,7 +7,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <functional>
 #include <algorithm>
+#include <vector>
 
 #include <unistd.h>
 #include <pwd.h>
@@ -66,6 +68,26 @@ static string gtb_rtrim (const string &s)
 **********************************************************************************************************************/
 static string gtb_trim (const string &s) {
     return gtb_rtrim(gtb_ltrim(s));
+}
+/**********************************************************************************************************************
+    description:    split string into vector
+    arguments:      s:  string
+                    c:  character as delimiter
+                    v:  vector to save string array
+    return:         string vector
+**********************************************************************************************************************/
+static void gtb_split(const string& s, char c, vector<string>& v) {
+    string::size_type i = 0;
+    string::size_type j = s.find(c);
+
+    while (j != string::npos) {
+        v.push_back(s.substr(i, j-i));
+        i = ++j;
+        j = s.find(c, j);
+
+        if (j == string::npos)
+            v.push_back(s.substr(i, s.length()));
+    }
 }
 /**********************************************************************************************************************
     description:    alibaba cloud sdk init
@@ -343,39 +365,46 @@ int main (int argc, char *argv[])
         return -EBUSY;
     }
 
-    // get domain name record
-    string record_id, record_value, record_rr;
-    if (gtb_get_domain_record(root["domain_name"].asString(),
-                              &record_id,
-                              &record_value,
-                              &record_rr)) {
-        cerr << "Invalid domain name." << endl;
-        return -EINVAL;
-    }
-    cout << "Old IPv4:     [" << record_value << "]" << endl;
+    // get ipv4 domain list
+    vector<string> domain_list_v4;
+    gtb_split(root["domain_name"].asString(), ',', domain_list_v4);
 
-    // get current ipv4
-    string ipv4;
-    if (gtb_get_curr_ipv4(root["query_ipv4"].asString(), &ipv4)) {
-        cerr << "Cannot get current IPv4." << endl;
-        return -EBUSY;
-    }
-    cout << "Current IPv4: [" << ipv4 << "]" << endl;
+    // update each ipv4 domain name
+    for (vector<string>::iterator i = domain_list_v4.begin(); i != domain_list_v4.end(); i++) {
+        // get domain name record
+        string record_id, record_value, record_rr;
+        if (gtb_get_domain_record(*i,
+                                  &record_id,
+                                  &record_value,
+                                  &record_rr)) {
+            cerr << "Invalid domain name: " << *i << endl;
+            return -EINVAL;
+        }
+        cout << "Old IPv4:     (" << *i << ")[" << record_value << "]" << endl;
 
-    // check if needed to update record
-    if (record_value == ipv4) {
-        cout << "No need to update." << endl;
-        return 0;
-    }
+        // get current ipv4
+        string ipv4;
+        if (gtb_get_curr_ipv4(root["query_ipv4"].asString(), &ipv4)) {
+            cerr << "Cannot get current IPv4." << endl;
+            return -EBUSY;
+        }
+        cout << "Current IPv4: (" << *i << ")[" << ipv4 << "]" << endl;
 
-    // set domain record
-    if (gtb_set_domain_record(record_id,
-                              record_rr,
-                              ipv4)) {
-        cerr << "Set domain record failed." << endl;
-        return -EINVAL;
+        // check if needed to update record
+        if (record_value == ipv4) {
+            cout << "No need to update." << endl;
+            return 0;
+        }
+
+        // set domain record
+        if (gtb_set_domain_record(record_id,
+                                  record_rr,
+                                  ipv4)) {
+            cerr << "Set domain record failed." << endl;
+            return -EINVAL;
+        }
+        cout << "Record successfully updated." << endl;
     }
-    cout << "Record successfully updated." << endl;
 
     // shutdown alibaba cloud sdk
     gtb_sdk_shutdown();
