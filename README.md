@@ -9,8 +9,10 @@ Simple DDNS utility with Alibaba Cloud (Aliyun) SDK
 	"access_key_secret" : "<AccessKey Secret>",
 	"connect_timeout" : 1500,
 	"read_timeout" : 4000,
-	"domain_name" : "ddns.domain.com",
-	"query_ipv4" : "https://api-ipv4.ip.sb/ip"
+	"domain_name" : "ddns4.domain.com,ipv4.domain.com",
+	"domain_name_v6" : "ddns6.domain.com,ipv6.domain.com",
+	"query_ipv4" : "https://api.ipify.org",
+	"query_ipv6" : "https://api6.ipify.org"
 }
 ```
 * `access_key_id`: Aliyun AccessKey ID
@@ -19,18 +21,24 @@ Simple DDNS utility with Alibaba Cloud (Aliyun) SDK
 * `read_timeout` (optional): Aliyun SDK read timeout in ms
 * `domain_name`: Domain name to update A record
 * `query_ipv4`: URL to query current public IPv4 address, **this URL should return IPv4 plain text!!!**
+* `domain_name_v6`: (optional) Domain name to update AAAA record
+* `query_ipv6`: (optional if `domain_name_v6` does not exist) URL to query current public IPv6 address, **this URL should return IPv6 plain text, and it should only have AAAA domain record!!!**
 
 2. Simply run this to check and update domain record if needed:
 ```shell
 $ aliddns
-Old IPv4:     [1.2.3.4]
-Current IPv4: [1.2.3.4]
-No need to update.
-
-$ aliddns
-Old IPv4:     [1.2.3.4]
-Current IPv4: [2.3.4.5]
-Record successfully updated.
+Old IPv4:     (ddns4.domain.com)[1.2.3.4]
+Current IPv4: (ddns4.domain.com)[1.1.1.1]
+Updated:      (ddns4.domain.com)[1.1.1.1]
+Old IPv4:     (ipv4.domain.com)[1.1.1.1]
+Current IPv4: (ipv4.domain.com)[1.1.1.1]
+Skipped:      (ipv4.domain.com)[1.1.1.1]
+Old IPv6:     (ddns6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:1]
+Current IPv6: (ddns6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:a55a]
+Updated:      (ddns6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:a55a]
+Old IPv6:     (ipv6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:a55a]
+Current IPv6: (ipv6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:a55a]
+Skipped:      (ipv6.domain.com)[a55a:a55a:a55a:a55a:a55a:a55a:a55a:a55a]
 ```
 
 ## Dependencies
